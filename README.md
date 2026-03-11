@@ -1,6 +1,6 @@
-# ChordLab 🎵
+# ChordLab 
 
-A guitar chord reference tool with interactive fretboard diagrams. Covers 35 chords across 6 categories with search, filtering, and detailed chord info. Open `index.html` in any browser — zero dependencies.
+A guitar chord reference tool with interactive fretboard diagrams. Covers 35 chords across 6 categories with search, filtering and detailed chord info. Open `index.html` in any browser, zero dependencies.
 
 ## Features
 - 35 chords: Major, Minor, 7th, Sus, Diminished/Augmented, Power
