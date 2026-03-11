@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChordLab – Guitar Chord Finder</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0d0d;
+    --surface: #161616;
+    --surface2: #1f1f1f;
+    --border: #2a2a2a;
+    --accent: #e8b84b;
+    --accent2: #c0392b;
+    --text: #f0ede8;
+    --muted: #6b6b6b;
+    --string-color: #b8a060;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grain overlay */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none; z-index: 999; opacity: 0.6;
+  }
+
+  header {
+    padding: 2rem 3rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2.2rem;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+  }
+
+  .logo span { color: var(--text); }
+
+  .tagline {
+    font-size: 0.75rem;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 3rem 2rem;
+  }
+
+  /* Search Section */
+  .search-section {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 1rem;
+    margin-bottom: 2.5rem;
+    align-items: end;
+  }
+
+  .search-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    margin-bottom: 0.5rem;
+  }
+
+  .search-input {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.9rem 1.2rem;
+    color: var(--text);
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.8rem;
+    letter-spacing: 0.1em;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .search-input:focus { border-color: var(--accent); }
+  .search-input::placeholder { color: var(--muted); }
+
+  .random-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 0.9rem 1.4rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .random-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Filter pills */
+  .filters {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 3rem;
+  }
+
+  .filter-pill {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 0.35rem 1rem;
+    border-radius: 100px;
+    cursor: pointer;
+    font-size: 0.78rem;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.05em;
+    transition: all 0.2s;
+  }
+
+  .filter-pill:hover { border-color: var(--text); color: var(--text); }
+  .filter-pill.active { background: var(--accent); border-color: var(--accent); color: #000; font-weight: 600; }
+
+  /* Grid of chords */
+  .chords-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1.5rem;
+  }
+
+  .chord-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1.5rem;
+    cursor: pointer;
+    transition: all 0.25s;
+    position: relative;
+    overflow: hidden;
+    animation: fadeIn 0.3s ease forwards;
+    opacity: 0;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .chord-card:hover {
+    border-color: var(--accent);
+    transform: translateY(-3px);
+    box-shadow: 0 12px 30px rgba(232,184,75,0.08);
+  }
+
+  .chord-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .chord-card:hover::before { opacity: 1; }
+
+  .chord-name {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2rem;
+    letter-spacing: 0.05em;
+    color: var(--text);
+    margin-bottom: 0.2rem;
+  }
+
+  .chord-type {
+    font-size: 0.7rem;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    font-family: 'JetBrains Mono', monospace;
+    margin-bottom: 1.2rem;
+  }
+
+  /* Fretboard diagram */
+  .fretboard {
+    position: relative;
+    width: 100%;
+    height: 130px;
+  }
+
+  .fretboard svg { width: 100%; height: 100%; }
+
+  .chord-notes {
+    margin-top: 1rem;
+    font-size: 0.7rem;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.1em;
+  }
+
+  /* Modal */
+  .modal-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.85);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+  }
+
+  .modal-overlay.open { display: flex; }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 2.5rem;
+    max-width: 500px;
+    width: 90%;
+    position: relative;
+    animation: modalIn 0.25s ease;
+  }
+
+  @keyframes modalIn {
+    from { transform: scale(0.95); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+
+  .modal-close {
+    position: absolute;
+    top: 1rem; right: 1.2rem;
+    background: none; border: none;
+    color: var(--muted); font-size: 1.5rem;
+    cursor: pointer; transition: color 0.2s;
+  }
+
+  .modal-close:hover { color: var(--text); }
+
+  .modal-chord-name {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 3.5rem;
+    letter-spacing: 0.05em;
+    line-height: 1;
+  }
+
+  .modal-chord-type {
+    font-size: 0.75rem;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    font-family: 'JetBrains Mono', monospace;
+    margin-bottom: 1.5rem;
+  }
+
+  .modal-fretboard {
+    background: var(--bg);
+    border-radius: 6px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .modal-fretboard svg { width: 100%; height: 180px; }
+
+  .detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+
+  .detail-item label {
+    font-size: 0.65rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    font-family: 'JetBrains Mono', monospace;
+    display: block;
+    margin-bottom: 0.25rem;
+  }
+
+  .detail-item p {
+    font-size: 0.9rem;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .no-results {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--muted);
+  }
+
+  .no-results h3 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2rem;
+    color: var(--border);
+    margin-bottom: 0.5rem;
+  }
+
+  /* String labels */
+  .string-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6rem;
+    fill: var(--muted);
+  }
+
+  .result-count {
+    font-size: 0.7rem;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    margin-bottom: 1.5rem;
+    letter-spacing: 0.1em;
+  }
+
+  .result-count span { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Chord<span>Lab</span></div>
+  <div class="tagline">Guitar Chord Reference // Open Source</div>
+</header>
+
+<main>
+  <div class="search-section">
+    <div>
+      <div class="search-label">Search Chord</div>
+      <input class="search-input" type="text" id="searchInput" placeholder="e.g. G Major, Am, C7..." autocomplete="off">
+    </div>
+    <button class="random-btn" onclick="randomChord()">⚄ Random</button>
+  </div>
+
+  <div class="filters" id="filters">
+    <button class="filter-pill active" data-type="all">All</button>
+    <button class="filter-pill" data-type="Major">Major</button>
+    <button class="filter-pill" data-type="Minor">Minor</button>
+    <button class="filter-pill" data-type="7th">7th</button>
+    <button class="filter-pill" data-type="Sus">Sus</button>
+    <button class="filter-pill" data-type="Dim">Dim / Aug</button>
+    <button class="filter-pill" data-type="Power">Power</button>
+  </div>
+
+  <div class="result-count" id="resultCount"></div>
+  <div class="chords-grid" id="chordsGrid"></div>
+</main>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal">
+    <button class="modal-close" onclick="document.getElementById('modalOverlay').classList.remove('open')">✕</button>
+    <div class="modal-chord-name" id="modalName"></div>
+    <div class="modal-chord-type" id="modalType"></div>
+    <div class="modal-fretboard" id="modalFretboard"></div>
+    <div class="detail-grid" id="modalDetails"></div>
+  </div>
+</div>
+
+<script>
+// ─── Chord Data ────────────────────────────────────────────────────────────────
+// frets: array of 6 strings (E A D G B e), value = fret number, -1 = muted, 0 = open
+const CHORDS = [
+  // MAJOR
+  { name: "C", full: "C Major", type: "Major", frets: [-1, 3, 2, 0, 1, 0], fingers: ["-","3","2","-","1","-"], notes: "C E G", mood: "Bright, Resolved" },
+  { name: "D", full: "D Major", type: "Major", frets: [-1, -1, 0, 2, 3, 2], fingers: ["-","-","-","1","3","2"], notes: "D F# A", mood: "Triumphant" },
+  { name: "E", full: "E Major", type: "Major", frets: [0, 2, 2, 1, 0, 0], fingers: ["-","2","3","1","-","-"], notes: "E G# B", mood: "Open, Powerful" },
+  { name: "F", full: "F Major", type: "Major", frets: [1, 1, 2, 3, 3, 1], fingers: ["1","1","2","3","4","1"], notes: "F A C", mood: "Warm, Rich" },
+  { name: "G", full: "G Major", type: "Major", frets: [3, 2, 0, 0, 0, 3], fingers: ["2","1","-","-","-","3"], notes: "G B D", mood: "Full, Ringing" },
+  { name: "A", full: "A Major", type: "Major", frets: [0, 0, 2, 2, 2, 0], fingers: ["-","-","1","2","3","-"], notes: "A C# E", mood: "Bright, Confident" },
+  { name: "B", full: "B Major", type: "Major", frets: [-1, 2, 4, 4, 4, 2], fingers: ["-","1","3","4","3","1"], notes: "B D# F#", mood: "Bold" },
+  // MINOR
+  { name: "Am", full: "A Minor", type: "Minor", frets: [0, 0, 2, 2, 1, 0], fingers: ["-","-","2","3","1","-"], notes: "A C E", mood: "Melancholic, Deep" },
+  { name: "Em", full: "E Minor", type: "Minor", frets: [0, 2, 2, 0, 0, 0], fingers: ["-","2","3","-","-","-"], notes: "E G B", mood: "Dark, Open" },
+  { name: "Dm", full: "D Minor", type: "Minor", frets: [-1, -1, 0, 2, 3, 1], fingers: ["-","-","-","2","3","1"], notes: "D F A", mood: "Sad, Haunting" },
+  { name: "Cm", full: "C Minor", type: "Minor", frets: [-1, 3, 5, 5, 4, 3], fingers: ["-","1","3","4","2","1"], notes: "C Eb G", mood: "Dark, Intense" },
+  { name: "Fm", full: "F Minor", type: "Minor", frets: [1, 1, 3, 3, 2, 1], fingers: ["1","1","3","4","2","1"], notes: "F Ab C", mood: "Brooding" },
+  { name: "Bm", full: "B Minor", type: "Minor", frets: [-1, 2, 4, 4, 3, 2], fingers: ["-","1","3","4","2","1"], notes: "B D F#", mood: "Moody" },
+  { name: "Gm", full: "G Minor", type: "Minor", frets: [3, 5, 5, 3, 3, 3], fingers: ["1","3","4","1","1","1"], notes: "G Bb D", mood: "Somber" },
+  // 7TH
+  { name: "G7", full: "G Dominant 7th", type: "7th", frets: [3, 2, 0, 0, 0, 1], fingers: ["3","2","-","-","-","1"], notes: "G B D F", mood: "Bluesy, Tense" },
+  { name: "E7", full: "E Dominant 7th", type: "7th", frets: [0, 2, 0, 1, 0, 0], fingers: ["-","2","-","1","-","-"], notes: "E G# B D", mood: "Jazzy, Blues" },
+  { name: "A7", full: "A Dominant 7th", type: "7th", frets: [0, 0, 2, 0, 2, 0], fingers: ["-","-","2","-","3","-"], notes: "A C# E G", mood: "Funky, Open" },
+  { name: "D7", full: "D Dominant 7th", type: "7th", frets: [-1, -1, 0, 2, 1, 2], fingers: ["-","-","-","2","1","3"], notes: "D F# A C", mood: "Bright, Jazzy" },
+  { name: "B7", full: "B Dominant 7th", type: "7th", frets: [-1, 2, 1, 2, 0, 2], fingers: ["-","2","1","3","-","4"], notes: "B D# F# A", mood: "Tense, Driving" },
+  { name: "Cmaj7", full: "C Major 7th", type: "7th", frets: [-1, 3, 2, 0, 0, 0], fingers: ["-","3","2","-","-","-"], notes: "C E G B", mood: "Dreamy, Lush" },
+  { name: "Amaj7", full: "A Major 7th", type: "7th", frets: [0, 0, 2, 1, 2, 0], fingers: ["-","-","3","1","4","-"], notes: "A C# E G#", mood: "Smooth, Sophisticated" },
+  // SUS
+  { name: "Dsus2", full: "D Suspended 2nd", type: "Sus", frets: [-1, -1, 0, 2, 3, 0], fingers: ["-","-","-","1","2","-"], notes: "D E A", mood: "Airy, Open" },
+  { name: "Dsus4", full: "D Suspended 4th", type: "Sus", frets: [-1, -1, 0, 2, 3, 3], fingers: ["-","-","-","1","2","3"], notes: "D G A", mood: "Floating, Unresolved" },
+  { name: "Asus2", full: "A Suspended 2nd", type: "Sus", frets: [0, 0, 2, 2, 0, 0], fingers: ["-","-","1","2","-","-"], notes: "A B E", mood: "Spacious" },
+  { name: "Esus4", full: "E Suspended 4th", type: "Sus", frets: [0, 2, 2, 2, 0, 0], fingers: ["-","1","2","3","-","-"], notes: "E A B", mood: "Building, Anticipation" },
+  { name: "Gsus4", full: "G Suspended 4th", type: "Sus", frets: [3, 3, 0, 0, 1, 3], fingers: ["2","3","-","-","1","4"], notes: "G C D", mood: "Epic, Cinematic" },
+  // DIM / AUG
+  { name: "Bdim", full: "B Diminished", type: "Dim", frets: [-1, 2, 3, 4, 3, -1], fingers: ["-","1","2","4","3","-"], notes: "B D F", mood: "Tense, Eerie" },
+  { name: "Edim", full: "E Diminished", type: "Dim", frets: [0, 1, 2, 3, 2, -1], fingers: ["-","1","2","4","3","-"], notes: "E G Bb", mood: "Dissonant, Unstable" },
+  { name: "Caug", full: "C Augmented", type: "Dim", frets: [-1, 3, 2, 1, 1, 0], fingers: ["-","4","3","1","2","-"], notes: "C E G#", mood: "Mysterious, Rising" },
+  { name: "Aaug", full: "A Augmented", type: "Dim", frets: [-1, 0, 3, 2, 2, 1], fingers: ["-","-","4","2","3","1"], notes: "A C# F", mood: "Tense, Chromatic" },
+  // POWER
+  { name: "E5", full: "E Power Chord", type: "Power", frets: [0, 2, 2, -1, -1, -1], fingers: ["-","1","2","-","-","-"], notes: "E B", mood: "Raw, Heavy" },
+  { name: "A5", full: "A Power Chord", type: "Power", frets: [-1, 0, 2, 2, -1, -1], fingers: ["-","-","1","2","-","-"], notes: "A E", mood: "Punchy, Driving" },
+  { name: "D5", full: "D Power Chord", type: "Power", frets: [-1, -1, 0, 2, 3, -1], fingers: ["-","-","-","1","3","-"], notes: "D A", mood: "Solid, Rock" },
+  { name: "G5", full: "G Power Chord", type: "Power", frets: [3, 5, 5, -1, -1, -1], fingers: ["1","3","4","-","-","-"], notes: "G D", mood: "Full, Powerful" },
+];
+
+// ─── Fretboard SVG Renderer ────────────────────────────────────────────────────
+function renderFretboard(frets, large = false) {
+  const W = 200, H = large ? 180 : 130;
+  const strings = 6, fretCount = 5;
+  const marginL = 22, marginT = large ? 30 : 22, marginR = 14;
+  const gridW = W - marginL - marginR;
+  const gridH = H - marginT - (large ? 24 : 18);
+  const strGap = gridW / (strings - 1);
+  const fretGap = gridH / fretCount;
+
+  // Find min fret (excluding 0 and -1) to determine position
+  const played = frets.filter(f => f > 0);
+  const minFret = played.length ? Math.min(...played) : 1;
+  const startFret = minFret > 1 ? minFret - 1 : 0;
+
+  const stringNames = ['E', 'A', 'D', 'G', 'B', 'e'];
+
+  let svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">`;
+
+  // Fret position indicator
+  if (startFret > 0) {
+    svg += `<text x="${marginL - 4}" y="${marginT + fretGap * 0.7}" text-anchor="end" fill="#e8b84b" font-family="JetBrains Mono" font-size="9" font-weight="600">${startFret + 1}fr</text>`;
+  }
+
+  // Nut line
+  if (startFret === 0) {
+    svg += `<line x1="${marginL}" y1="${marginT}" x2="${marginL + gridW}" y2="${marginT}" stroke="#b8a060" stroke-width="3" stroke-linecap="round"/>`;
+  }
+
+  // Fret lines
+  for (let f = 0; f <= fretCount; f++) {
+    const y = marginT + f * fretGap;
+    svg += `<line x1="${marginL}" y1="${y}" x2="${marginL + gridW}" y2="${y}" stroke="#2a2a2a" stroke-width="${f === 0 ? 1 : 0.8}"/>`;
+  }
+
+  // String lines
+  for (let s = 0; s < strings; s++) {
+    const x = marginL + s * strGap;
+    svg += `<line x1="${x}" y1="${marginT}" x2="${x}" y2="${marginT + gridH}" stroke="#3a3020" stroke-width="${s === 0 || s === 5 ? 1.5 : 1}"/>`;
+    // String labels
+    const labelY = large ? marginT + gridH + 18 : marginT + gridH + 13;
+    svg += `<text x="${x}" y="${labelY}" text-anchor="middle" fill="#555" font-family="JetBrains Mono" font-size="${large ? 9 : 8}">${stringNames[s]}</text>`;
+  }
+
+  // Finger markers & mute/open symbols
+  for (let s = 0; s < strings; s++) {
+    const x = marginL + s * strGap;
+    const f = frets[s];
+
+    if (f === -1) {
+      // Muted
+      svg += `<text x="${x}" y="${marginT - 6}" text-anchor="middle" fill="#c0392b" font-family="JetBrains Mono" font-size="${large ? 10 : 9}" font-weight="600">×</text>`;
+    } else if (f === 0) {
+      // Open
+      svg += `<circle cx="${x}" cy="${marginT - 7}" r="${large ? 4 : 3}" fill="none" stroke="#e8b84b" stroke-width="1.2"/>`;
+    } else {
+      const localFret = f - startFret;
+      if (localFret >= 1 && localFret <= fretCount) {
+        const y = marginT + (localFret - 0.5) * fretGap;
+        svg += `<circle cx="${x}" cy="${y}" r="${large ? 9 : 7}" fill="#e8b84b"/>`;
+        svg += `<circle cx="${x}" cy="${y}" r="${large ? 9 : 7}" fill="none" stroke="#c89a30" stroke-width="0.8"/>`;
+      }
+    }
+  }
+
+  svg += `</svg>`;
+  return svg;
+}
+
+// ─── State ─────────────────────────────────────────────────────────────────────
+let activeFilter = 'all';
+let searchQuery = '';
+
+function getFiltered() {
+  return CHORDS.filter(c => {
+    const matchFilter = activeFilter === 'all' || c.type === activeFilter;
+    const q = searchQuery.toLowerCase();
+    const matchSearch = !q ||
+      c.name.toLowerCase().includes(q) ||
+      c.full.toLowerCase().includes(q) ||
+      c.type.toLowerCase().includes(q) ||
+      c.notes.toLowerCase().includes(q);
+    return matchFilter && matchSearch;
+  });
+}
+
+function render() {
+  const filtered = getFiltered();
+  const grid = document.getElementById('chordsGrid');
+  const count = document.getElementById('resultCount');
+
+  count.innerHTML = `Showing <span>${filtered.length}</span> chord${filtered.length !== 1 ? 's' : ''}`;
+
+  if (!filtered.length) {
+    grid.innerHTML = `<div class="no-results"><h3>No Chords Found</h3><p>Try a different search or filter</p></div>`;
+    return;
+  }
+
+  grid.innerHTML = filtered.map((c, i) => `
+    <div class="chord-card" onclick="openModal('${c.name}')" style="animation-delay:${i * 0.04}s">
+      <div class="chord-name">${c.full}</div>
+      <div class="chord-type">${c.type}</div>
+      <div class="fretboard">${renderFretboard(c.frets)}</div>
+      <div class="chord-notes">${c.notes}</div>
+    </div>
+  `).join('');
+}
+
+// ─── Modal ─────────────────────────────────────────────────────────────────────
+function openModal(name) {
+  const c = CHORDS.find(x => x.name === name);
+  if (!c) return;
+  document.getElementById('modalName').textContent = c.full;
+  document.getElementById('modalType').textContent = c.type + ' Chord';
+  document.getElementById('modalFretboard').innerHTML = renderFretboard(c.frets, true);
+  document.getElementById('modalDetails').innerHTML = `
+    <div class="detail-item"><label>Notes</label><p>${c.notes}</p></div>
+    <div class="detail-item"><label>Mood</label><p>${c.mood}</p></div>
+    <div class="detail-item"><label>Strings</label><p>${c.frets.map((f,i) => f === -1 ? '×' : f === 0 ? '○' : f).join(' ')}</p></div>
+    <div class="detail-item"><label>Fingering</label><p>${c.fingers.join(' ')}</p></div>
+  `;
+  document.getElementById('modalOverlay').classList.add('open');
+}
+
+function closeModal(e) {
+  if (e.target === document.getElementById('modalOverlay'))
+    document.getElementById('modalOverlay').classList.remove('open');
+}
+
+function randomChord() {
+  const r = CHORDS[Math.floor(Math.random() * CHORDS.length)];
+  document.getElementById('searchInput').value = r.full;
+  searchQuery = r.full;
+  activeFilter = 'all';
+  document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+  document.querySelector('[data-type="all"]').classList.add('active');
+  render();
+  setTimeout(() => openModal(r.name), 150);
+}
+
+// ─── Events ────────────────────────────────────────────────────────────────────
+document.getElementById('searchInput').addEventListener('input', e => {
+  searchQuery = e.target.value;
+  render();
+});
+
+document.getElementById('filters').addEventListener('click', e => {
+  const pill = e.target.closest('.filter-pill');
+  if (!pill) return;
+  activeFilter = pill.dataset.type;
+  document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+  pill.classList.add('active');
+  render();
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.getElementById('modalOverlay').classList.remove('open');
+});
+
+// Init
+render();
+</script>
+</body>
+</html>
